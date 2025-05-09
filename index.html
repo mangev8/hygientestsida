@@ -1,201 +1,154 @@
-import React, { useState } from 'react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vårdhygien – Hjälpmedel</title>
+  <style>
+    .back-button { background: #000; color: #fff; margin-bottom: 16px; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #f0f8ff; }
+    .container { padding: 20px; min-height: 100vh; }
+    h1 { text-align: center; font-size: 32px; font-weight: bold; cursor: pointer; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .card { background-color: #ffffff; padding: 16px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; cursor: pointer; }
+    .card h2 { margin: 0; color: #007bff; font-size: 16px; }
+    .year-wheel { display: flex; align-items: center; height: 400px; }
+    .year-wheel path, .year-wheel text { cursor: pointer; }
+    .year-info { width: 400px; height: 100%; margin-left: 16px; padding: 16px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h2.section-title { font-size: 24px; margin: 60px 0 40px; text-align: center; }
+    button { padding: 4px 12px; border: none; border-radius: 4px; cursor: pointer; background: #ccc; color: #fff; margin-right: 8px; font-size: 12px; }
+    button.active { background: #007bff; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const categories = [
+      { key: 'stadrutiner', label: 'Städrutiner' },
+      { key: 'arb', label: 'Antibiotikaresistenta bakterier' },
+      { key: 'tuberkulos', label: 'Tuberkulos' },
+      { key: 'gastroenterit', label: 'Gastroenterit' },
+      { key: 'vissrisk', label: 'Vissrisk' },
+      { key: 'hogrisk', label: 'Högrisk' }
+    ];
+    const months = ['Januari','Februari','Mars','April','Maj','Juni','Juli','Augusti','September','Oktober','November','December'];
+    const segmentColors = ['#ff9999','#ffcc99','#ffff99','#ccff99','#99ff99','#99ffcc','#99ffff','#99ccff','#9999ff','#cc99ff','#ff99ff','#ff99cc'];
+    const scenarioData = {
+      stadrutiner: [ { title: 'Daglig städ av patientrum', desc: 'Instruktioner för daglig städning.' }, { title: 'Slutstäd', desc: 'Instruktioner för slutstädning.' } ],
+      tuberkulos:   [ { title: 'Luftburen isolation', desc: 'Använd FFP3-mask.' }, { title: 'Latent vs aktiv', desc: 'Skillnader i handläggning.' } ],
+      gastroenterit:[ { title: 'Cohorting', desc: 'Patientplacering vid utbrott.' }, { title: 'Basala hygienrutiner', desc: 'Extra handtvätt.' } ],
+      vissrisk:     [ { title: 'Vissrisk 1', desc: 'Detaljer scenario 1.' }, { title: 'Vissrisk 2', desc: 'Detaljer scenario 2.' } ],
+      hogrisk:      [ { title: 'Högrisk 1', desc: 'Detaljer scenario 1.' }, { title: 'Högrisk 2', desc: 'Detaljer scenario 2.' } ]
+    };
+    const arbTypes = ['MRSA','ESBL','ESBL-CARBA','VRE'];
+    const arbActions = ['screening','hygienrutin','städning'];
+    const screeningQuestions = [
+      'Har patienten vårdats utomlands senaste 6 månaderna?',
+      'Har patienten sår/exem som ej uppkommit under vårdtillfället?',
+      'Finns det infarter som ej uppkommit under detta vårdtillfälle?'
+    ];
+    let state = { selectedCat: null, selectedMonth: new Date().getMonth(), arbType: null, arbAction: null, responses: {} };
 
-// Kategorier
-const categories = [
-  { key: 'stadrutiner', label: 'Städrutiner' },
-  { key: 'arb', label: 'ARB (Antibiotikaresistenta bakterier)' },
-  { key: 'tuberkulos', label: 'Tuberkulos' },
-  { key: 'gastroenterit', label: 'Gastroenterit' },
-  { key: 'vissrisk', label: 'Vissrisk' },
-  { key: 'hogrisk', label: 'Högrisk' },
-];
-
-// Tema/Färgschema
-const theme = {
-  background: '#f0f8ff',
-  primary: '#007bff',
-  secondary: '#28a745',
-  cardBackground: '#ffffff',
-  text: '#333333',
-  mutedText: '#555555',
-  shadow: 'rgba(0, 0, 0, 0.1)',
-};
-
-// Årshjul-data
-const months = ['Januari','Februari','Mars','April','Maj','Juni','Juli','Augusti','September','Oktober','November','December'];
-const segmentColors = ['#ff9999','#ffcc99','#ffff99','#ccff99','#99ff99','#99ffcc','#99ffff','#99ccff','#9999ff','#cc99ff','#ff99ff','#ff99cc'];
-
-// Scenario-data för övriga kategorier
-const scenarioData = {
-  stadrutiner: [
-    { title: 'Daglig städ av patientrum', desc: 'Instruktioner för daglig städning av patientrum.' },
-    { title: 'Slutstäd av patientrum/plats', desc: 'Instruktioner för slutstädning av patientrum eller plats.' }
-  ],
-  tuberkulos: [
-    { title: 'Luftburen isolation', desc: 'Riktlinjer för användning av FFP3-mask och isoleringsrum.' },
-    { title: 'Latent vs aktiv', desc: 'Skillnader i handläggning av latent och aktiv tuberkulos.' }
-  ],
-  gastroenterit: [
-    { title: 'Cohorting', desc: 'Patientplacering och cohorting vid utbrott.' },
-    { title: 'Basala hygienrutiner', desc: 'Extra frekvens av handtvätt och desinfektion.' }
-  ],
-  vissrisk: [
-    { title: 'Vissrisk Scenario 1', desc: 'Detaljer för vissrisk scenario 1.' },
-    { title: 'Vissrisk Scenario 2', desc: 'Detaljer för vissrisk scenario 2.' }
-  ],
-  hogrisk: [
-    { title: 'Högrisk Scenario 1', desc: 'Detaljer för högrisk scenario 1.' },
-    { title: 'Högrisk Scenario 2', desc: 'Detaljer för högrisk scenario 2.' }
-  ]
-};
-
-// ARB-screening data
-const arbTypes = ['MRSA', 'ESBL', 'ESBL-CARBA', 'VRE'];
-const screeningQuestions = [
-  'Har patienten vårdats utomlands senaste 6 månaderna?',
-  'Har patienten sår/exem som ej uppkommit under vårdtillfället?',
-  'Finns det infarter (KAD, PVK, SVP, CVK) som ej uppkommit under detta vårdtillfälle?'
-];
-
-export default function App() {
-  const [selectedCat, setSelectedCat] = useState(null);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedScenario, setSelectedScenario] = useState(null);
-  const [selectedArbType, setSelectedArbType] = useState(null);
-  const [responses, setResponses] = useState({});
-
-  // Årshjul-konstanter
-  const count = months.length;
-  const center = 200;
-  const radius = 180;
-
-  // Rendera årshjul-segment
-  const segments = months.map((m, idx) => {
-    const start = (360/count)*idx;
-    const end = start + 360/count;
-    const x1 = center + radius * Math.cos(Math.PI/180*start);
-    const y1 = center + radius * Math.sin(Math.PI/180*start);
-    const x2 = center + radius * Math.cos(Math.PI/180*end);
-    const y2 = center + radius * Math.sin(Math.PI/180*end);
-    const d = `M${center},${center} L${x1},${y1} A${radius},${radius} 0 0,1 ${x2},${y2} Z`;
-    return <path key={idx} d={d} fill={segmentColors[idx]} stroke="#fff" strokeWidth={1} style={{cursor:'pointer'}} onClick={() => setSelectedMonth(idx)} />;
-  });
-
-  // Rendera etiketter
-  const labels = months.map((m, idx) => {
-    const angle = (360/count)*(idx+0.5);
-    const r = radius - 50;
-    const x = center + r * Math.cos(Math.PI/180*angle);
-    const y = center + r * Math.sin(Math.PI/180*angle);
-    return <text key={idx} x={x} y={y} fill={theme.text} fontSize={12} textAnchor="middle" transform={`rotate(${angle},${x},${y})`} style={{pointerEvents:'none'}}>{m}</text>;
-  });
-
-  // Förvald info för årshjul
-  const infoBox = (
-    <div style={{ width:400, height:'100%', marginLeft:16, background:segmentColors[selectedMonth], padding:16, borderRadius:8, boxShadow:`0 2px 4px ${theme.shadow}` }}>
-      <h3 style={{ marginTop:0 }}>{months[selectedMonth]}</h3>
-      <p>Information för {months[selectedMonth]}...</p>
-    </div>
-  );
-
-  // Startsida med kategorier och årshjul
-  if (!selectedCat) {
-    return (
-      <div style={{ fontFamily:'Arial', padding:20, background:theme.background, minHeight:'100vh' }}>
-        <h1 style={{ textAlign:'center', fontSize:24 }}>Vårdhygien – Hjälpmedel</h1>
-        <p style={{ textAlign:'center', color:theme.primary }}>Infektion avd i64</p>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:16, margin:'20px 0' }}>
-          {categories.map(cat => <div key={cat.key} style={{ background:theme.cardBackground, padding:16, borderRadius:8, boxShadow:`0 2px 4px ${theme.shadow}`, cursor:'pointer', textAlign:'center' }} onClick={() => setSelectedCat(cat.key)}><h2 style={{color:theme.secondary}}>{cat.label}</h2></div>)}
-        </div>
-        <h2 style={{ textAlign:'center', margin:'20px 0 12px' }}>Årshjul vårdhygien</h2>
-        <div style={{ display:'flex', height:400, alignItems:'center' }}>
-          <svg width={400} height={400} viewBox="0 0 400 400">{segments}{labels}</svg>
-          {infoBox}
-        </div>
-      </div>
-    );
-  }
-
-  // ARB-kategori med flöde
-  if (selectedCat === 'arb') {
-    // Scenario-val
-    if (!selectedScenario) {
-      return (
-        <div style={{ fontFamily:'Arial', padding:20, background:theme.background, minHeight:'100vh' }}>
-          <button onClick={() => setSelectedCat(null)} style={{ marginBottom:16 }}>← Tillbaka</button>
-          <h1>ARB</h1>
-          <ul style={{ listStyle:'none', padding:0 }}>
-            {['screening','hygienrutin','städning'].map(key => (
-              <li key={key} style={{ background:theme.cardBackground, padding:16, borderRadius:8, boxShadow:`0 1px 3px ${theme.shadow}`, cursor:'pointer', marginBottom:8 }} onClick={() => setSelectedScenario(key)}>
-                <h2 style={{ margin:0, color:theme.secondary }}>{key.charAt(0).toUpperCase()+key.slice(1)}</h2>
-              </li>
-            ))}
-          </ul>
-        </div>
-      );
+    function render() {
+      const app = document.getElementById('app');
+      app.innerHTML = '';
+      const container = document.createElement('div'); container.className='container';
+      const header = document.createElement('h1'); header.textContent='Vårdhygien – Hjälpmedel'; header.onclick=resetAll; container.appendChild(header);
+      if (!state.selectedCat) renderHome(container);
+      else if (state.selectedCat==='arb') renderArb(container);
+      else renderScenario(container);
+      app.appendChild(container);
     }
-    // Screening-flöde
-    if (selectedScenario === 'screening') {
-      if (!selectedArbType) {
-        return (
-          <div style={{ fontFamily:'Arial', padding:20, background:theme.background, minHeight:'100vh' }}>
-            <button onClick={() => setSelectedScenario(null)} style={{ marginBottom:16 }}>← Tillbaka</button>
-            <h1>Screening - Välj typ</h1>
-            <ul style={{ listStyle:'none', padding:0 }}>
-              {arbTypes.map(type => (
-                <li key={type} style={{ background:theme.cardBackground, padding:16, borderRadius:8, boxShadow:`0 1px 3px ${theme.shadow}`, cursor:'pointer', marginBottom:8 }} onClick={() => { setSelectedArbType(type); setResponses({}); }}>
-                  <h2 style={{ margin:0, color:theme.secondary }}>{type}</h2>
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
+    function resetAll() { state={selectedCat:null,selectedMonth:new Date().getMonth(),arbType:null,arbAction:null,responses:{}}; render(); }
+    function createBackButton(onClick) { const btn=document.createElement('button'); btn.textContent='← Tillbaka'; btn.className='back-button'; btn.onclick=onClick; return btn; }
+
+    function renderHome(parent) {
+      const subtitle=document.createElement('p'); subtitle.textContent='Infektion avd i64'; subtitle.style.textAlign='center'; subtitle.style.color='#000'; parent.appendChild(subtitle);
+      const grid=document.createElement('div'); grid.className='grid';
+      categories.forEach(cat=>{
+        const card=document.createElement('div'); card.className='card'; card.onclick=()=>{state.selectedCat=cat.key;render();};
+        const h2=document.createElement('h2'); h2.textContent=cat.label; card.appendChild(h2);
+        grid.appendChild(card);
+      }); parent.appendChild(grid);
+      const title2=document.createElement('h2'); title2.textContent='Årshjul vårdhygien'; title2.className='section-title'; parent.appendChild(title2);
+      renderYearWheel(parent);
+    }
+    function renderYearWheel(parent) {
+      const div=document.createElement('div'); div.className='year-wheel';
+      const svgNS='http://www.w3.org/2000/svg'; const svg=document.createElementNS(svgNS,'svg');
+      svg.setAttribute('width',400); svg.setAttribute('height',400); svg.setAttribute('viewBox','0 0 400 400');
+      const count=months.length, center=200, radius=180, seg=(2*Math.PI)/count;
+      months.forEach((m,i)=>{
+        const s=i*seg-Math.PI/2, e=s+seg;
+        const x1=center+radius*Math.cos(s), y1=center+radius*Math.sin(s);
+        const x2=center+radius*Math.cos(e), y2=center+radius*Math.sin(e);
+        const path=document.createElementNS(svgNS,'path');
+        path.setAttribute('d',`M${center},${center} L${x1},${y1} A${radius},${radius} 0 0,1 ${x2},${y2} Z`);
+        path.setAttribute('fill',segmentColors[i]); path.setAttribute('stroke','#fff'); path.style.cursor='pointer';
+        path.onclick=()=>{state.selectedMonth=i;render();}; svg.appendChild(path);
+        const textEl=document.createElementNS(svgNS,'text');
+        const ang=s+seg/2;
+        textEl.setAttribute('x',center+(radius-50)*Math.cos(ang));
+        textEl.setAttribute('y',center+(radius-50)*Math.sin(ang));
+        textEl.setAttribute('text-anchor','middle'); textEl.setAttribute('dominant-baseline','middle');
+        textEl.style.fontSize='16px'; textEl.style.fill='#333'; textEl.style.cursor='pointer';
+        textEl.onclick=path.onclick;
+        textEl.textContent=m; svg.appendChild(textEl);
+      }); div.appendChild(svg);
+      const info=document.createElement('div'); info.className='year-info'; info.style.background=segmentColors[state.selectedMonth];
+      const h3=document.createElement('h3'); h3.textContent=months[state.selectedMonth]; info.appendChild(h3);
+      const p=document.createElement('p'); p.textContent=`Information för ${months[state.selectedMonth]}`; info.appendChild(p);
+      div.appendChild(info); parent.appendChild(div);
+    }
+    function renderArb(parent) {
+      parent.appendChild(createBackButton(()=>{state.selectedCat=null;render();}));
+      if (!state.arbType) {
+        const grid=document.createElement('div'); grid.className='grid';
+        arbTypes.forEach(t=>{
+          const card=document.createElement('div'); card.className='card'; card.onclick=()=>{state.arbType=t;render();};
+          const h2=document.createElement('h2'); h2.textContent=t; card.appendChild(h2); grid.appendChild(card);
+        }); parent.appendChild(grid);
+      } else if (!state.arbAction) {
+        const grid=document.createElement('div'); grid.className='grid';
+        arbActions.forEach(a=>{
+          const card=document.createElement('div'); card.className='card'; card.onclick=()=>{state.arbAction=a;render();};
+          const h2=document.createElement('h2'); h2.textContent=a; card.appendChild(h2); grid.appendChild(card);
+        }); parent.appendChild(grid);
+      } else if (state.arbAction==='screening') {
+        screeningQuestions.forEach((q,i)=>{
+          const div=document.createElement('div'); div.style.margin='16px 0';
+          const p=document.createElement('p'); p.textContent=q; div.appendChild(p);
+          ['Ja','Nej'].forEach(ans=>{
+            const btn=document.createElement('button'); btn.textContent=ans; const val=ans==='Ja';
+            btn.className=state.responses[i]===val?'active':'';
+            btn.onclick=()=>{state.responses[i]=val;render();}; div.appendChild(btn);
+          }); parent.appendChild(div);
+        });
+        if (Object.keys(state.responses).length===screeningQuestions.length) {
+          const summary=document.createElement('div'); summary.style.padding='16px'; summary.style.borderRadius='4px'; summary.style.marginTop='16px';
+          const anyYes=Object.values(state.responses).some(v=>v);
+          summary.style.background=anyYes?'#d4edda':'#f8d7da';
+          const p2=document.createElement('p'); p2.textContent=anyYes?'Instruktioner för screening.':'Ingen screening krävs.';
+          summary.appendChild(p2); parent.appendChild(summary);
+        }
+      } else {
+        const p=document.createElement('p'); p.textContent=`Detaljer för ${state.arbAction} vid ${state.arbType}.`;
+        parent.appendChild(p);
       }
-      // Visa frågor samtidigt
-      const allAnswered = Object.keys(responses).length === screeningQuestions.length;
-      const anyYes = Object.values(responses).some(r => r);
-      return (
-        <div style={{ fontFamily:'Arial', padding:20, background:theme.background, minHeight:'100vh' }}>
-          <button onClick={() => { setSelectedArbType(null); setResponses({}); }} style={{ marginBottom:16 }}>← Tillbaka</button>
-          <h1>{selectedArbType} Screening</h1>
-          {screeningQuestions.map((q,i) => (
-            <div key={i} style={{ background:theme.cardBackground, padding:16, borderRadius:8, boxShadow:`0 1px 3px ${theme.shadow}`, marginBottom:8 }}>
-              <p>{q}</p>
-              <div style={{ display:'flex', gap:12, marginTop:8 }}>
-                <button style={{ padding:'8px 16px', background:theme.secondary, color:'#fff', border:'none', borderRadius:4, opacity: responses[i]===true?1:0.7 }} onClick={() => setResponses({...responses, [i]: true})}>Ja</button>
-                <button style={{ padding:'8px 16px', background:'#dc3545', color:'#fff', border:'none', borderRadius:4, opacity: responses[i]===false?1:0.7 }} onClick={() => setResponses({...responses, [i]: false})}>Nej</button>
-              </div>
-            </div>
-          ))}
-          {allAnswered && anyYes && <div style={{ background:'#d4edda', padding:16, borderRadius:4, marginTop:16 }}><p>Instruktioner för hur man ska screena {selectedArbType} enligt vårdhandboken.</p></div>}
-          {allAnswered && !anyYes && <div style={{ background:'#f8d7da', padding:16, borderRadius:4, marginTop:16 }}><p>Ingen vidare screening krävs enligt aktuella riktlinjer.</p></div>}
-        </div>
-      );
     }
-    // Hygienrutin eller städning
-    return (
-      <div style={{ fontFamily:'Arial', padding:20, background:theme.background, minHeight:'100vh' }}>
-        <button onClick={() => setSelectedScenario(null)} style={{ marginBottom:16 }}>← Tillbaka</button>
-        <h1>{selectedScenario.charAt(0).toUpperCase()+selectedScenario.slice(1)}</h1>
-        <p>Detaljer för {selectedScenario} vid ARB.</p>
-      </div>
-    );
-  }
-
-  // Övriga kategorier
-  const arr = scenarioData[selectedCat] || [];
-  return (
-    <div style={{ fontFamily:'Arial', padding:20, background:theme.background, minHeight:'100vh' }}>
-      <button onClick={() => setSelectedCat(null)} style={{ marginBottom:16 }}>← Tillbaka</button>
-      <h1>{categories.find(c => c.key === selectedCat).label}</h1>
-      <ul style={{ listStyle:'none', padding:0 }}>
-        {arr.map((s,i) => (
-          <li key={i} style={{ background:theme.cardBackground, margin:'12px 0', padding:16, borderRadius:8, boxShadow:`0 1px 3px ${theme.shadow}` }}>
-            <h2 style={{ margin:0, color:theme.secondary }}>{s.title}</h2>
-            <p style={{ color:theme.mutedText }}>{s.desc}</p>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+    function renderScenario(parent) {
+      parent.appendChild(createBackButton(()=>{state.selectedCat=null;render();}));
+      const cat=state.selectedCat;
+      const title=document.createElement('h2'); title.textContent=(categories.find(c=>c.key===cat)||{}).label; parent.appendChild(title);
+      const grid=document.createElement('div'); grid.className='grid';
+      (scenarioData[cat]||[]).forEach(sc=>{
+        const card=document.createElement('div'); card.className='card';
+        const h3=document.createElement('h3'); h3.textContent=sc.title; card.appendChild(h3);
+        const p=document.createElement('p'); p.textContent=sc.desc; card.appendChild(p);
+        grid.appendChild(card);
+      }); parent.appendChild(grid);
+    }
+    render();
+  </script>
+</body>
+</html>
